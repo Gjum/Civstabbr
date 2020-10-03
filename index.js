@@ -148,26 +148,7 @@ async function createGroupChatCommand(message) {
 	)
 	if (spectatorRole) pushPerms(spectatorRole?.id, true)
 
-	// check the group chat doesn't exist already
-	const existingChannel = guild.channels.cache.find((ch) => {
-		const anyIncorrect = Object.entries(game.nationRoles).find(([n, r]) => {
-			const shouldHavePerm = !!nationsChan[n]
-			const permsAllow = ch.permissionOverwrites.get(r.id)?.allow
-			const hasAllow =
-				permsAllow &&
-				useChannelPerms.map((p) => permsAllow.has(p)).reduce((a, b) => a || b, false)
-			const permsDeny = ch.permissionOverwrites.get(r.id)?.deny
-			const hasDeny =
-				permsDeny &&
-				useChannelPerms.map((p) => permsDeny.has(p)).reduce((a, b) => a && b, true)
-			return hasAllow === shouldHavePerm && hasDeny !== shouldHavePerm
-		})
-		return !anyIncorrect
-	})
-	if (existingChannel)
-		return message.channel.send(
-			`That group channel already exists: https://discord.com/channels/${commGuildId}/${existingChannel.id}`
-		)
+	// TODO check the group chat doesn't exist already
 
 	// actually create the channel
 	const parentCategoryName = categoryNameForId(game.id).toLowerCase()
