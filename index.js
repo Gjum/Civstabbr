@@ -12,7 +12,9 @@ const spectatorRoleNameForGame = (gameId) => `Spectator ${gameId}`
 
 const nationNames = 'Austria England France Germany Italy Russia Turkey'.split(' ')
 
+/** @type {Discord.PermissionString[]} */
 const useChannelPerms = ['READ_MESSAGE_HISTORY', 'SEND_MESSAGES', 'VIEW_CHANNEL']
+
 const d = new Discord.Client()
 d.on('error', (e) => console.error(e))
 d.on('warn', (e) => console.warn(e))
@@ -135,7 +137,8 @@ async function createGroupChatCommand(message) {
 	}
 
 	for (const [nationName, nationRole] of Object.entries(game.nationRoles)) {
-		pushPerms(nationRole.id, !!nationsChan[nationName])
+		const roleCanSeeChannel = !!nationsChan[nationName]
+		pushPerms(nationRole.id, roleCanSeeChannel)
 	}
 	// deny @ everyone
 	pushPerms(guild.id, false)
@@ -149,7 +152,9 @@ async function createGroupChatCommand(message) {
 	const existingChannel = guild.channels.cache.find((ch) => {
 		const anyIncorrect = Object.entries(game.nationRoles).find(([n, r]) => {
 			const shouldHavePerm = !!nationsChan[n]
-			const hasPerm = !!ch.permissionOverwrites[r.id]
+			const perms = ch.permissionOverwrites.get(r.id)?.allow
+			const hasPerm =
+				perms && useChannelPerms.map((p) => perms.has(p)).reduce((a, b) => a || b, false)
 			return hasPerm === shouldHavePerm
 		})
 		return !anyIncorrect
@@ -179,7 +184,10 @@ async function createGroupChatCommand(message) {
 }
 
 d.on('ready', async () => {
-	d.user.setActivity(':dagger: Playing Backstabbr')
+	console.log(
+		`Discord connected. @${d.user.username}#${d.user.discriminator} <@${d.user.id}>`
+	)
+	d.user.setActivity({ name: 'Backstabbr', emoji: ':dagger:' })
 	guild = await d.guilds.fetch(commGuildId)
 	game = new Game(1)
 })
