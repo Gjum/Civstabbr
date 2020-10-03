@@ -132,7 +132,7 @@ async function createGroupChatCommand(message) {
 		permissionOverwrites.push({
 			id: roleId,
 			allow: allow ? useChannelPerms : undefined,
-			deny: !allow ? undefined : useChannelPerms,
+			deny: !allow ? useChannelPerms : undefined,
 		})
 	}
 
