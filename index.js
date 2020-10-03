@@ -7,10 +7,12 @@ const adminRoleId = process.env.ADMIN_ROLE_ID
 const ownerTag = '@Gjum#1398'
 const ownerId = '730426592332873858'
 
-const categoryNameForId = (gameId) => `Diplomacy Gaming ${gameId}`
+const categoryNameForId = (gameId) => 'Test' //`Diplomacy Gaming ${gameId}`
+const spectatorRoleNameForGame = (gameId) => `Spectator ${gameId}`
 
 const nationNames = 'Austria England France Germany Italy Russia Turkey'.split(' ')
 
+const useChannelPerms = ['READ_MESSAGE_HISTORY', 'SEND_MESSAGES', 'VIEW_CHANNEL']
 const d = new Discord.Client()
 d.on('error', (e) => console.error(e))
 d.on('warn', (e) => console.warn(e))
@@ -63,13 +65,6 @@ async function findNationForMember(member) {
 	return { name, role }
 }
 
-async function reloadCommandPermitted(message) {
-	const member = guild.member(message.author)
-	const hasAdminRole = member.roles.cache.get(adminRoleId)
-	const isBotOwner = member.id === ownerId
-	return hasAdminRole || isBotOwner
-}
-
 /** @param {Discord.Message} message */
 async function helpCommand(message) {
 	const canReloadBot = await reloadCommandPermitted(message)
@@ -81,6 +76,13 @@ async function helpCommand(message) {
 		response += '\n`reload` - Reload the bot to internally update roles and players'
 
 	message.channel.send(response)
+}
+
+async function reloadCommandPermitted(message) {
+	const member = guild.member(message.author)
+	const hasAdminRole = member.roles.cache.get(adminRoleId)
+	const isBotOwner = member.id === ownerId
+	return hasAdminRole || isBotOwner
 }
 
 /** @param {Discord.Message} message */
@@ -118,18 +120,30 @@ async function createGroupChatCommand(message) {
 		nationName = nationNames.find((n) => n.toLowerCase() === nationName)
 		const nationRole = game.nationRoles[nationName]
 		if (!nationRole) return message.channel.send(`Unknown nation name: ${nationNameRaw}`)
-		nationsChan[nationNameRaw] = nationRole
+		nationsChan[nationName] = nationRole
 	}
 
 	if (Object.keys(nationsChan).length < 3)
 		return message.channel.send(`The group channel needs 3 or more nations.`)
 
-	for (const [nationName, nationRole] of Object.entries(nationsChan)) {
+	function pushPerms(roleId, allow = false) {
 		permissionOverwrites.push({
-			id: nationRole.id,
-			allow: ['READ_MESSAGE_HISTORY', 'SEND_MESSAGES'],
+			id: roleId,
+			allow: allow ? useChannelPerms : undefined,
+			deny: !allow ? undefined : useChannelPerms,
 		})
 	}
+
+	for (const [nationName, nationRole] of Object.entries(game.nationRoles)) {
+		pushPerms(nationRole.id, !!nationsChan[nationName])
+	}
+	// deny @ everyone
+	pushPerms(guild.id, false)
+	// allow spectators
+	const spectatorRole = guild.roles.cache.find(
+		(r) => r.name === spectatorRoleNameForGame(game.id)
+	)
+	if (spectatorRole) pushPerms(spectatorRole?.id, true)
 
 	// check the group chat doesn't exist already
 	const existingChannel = guild.channels.cache.find((ch) => {
@@ -151,6 +165,7 @@ async function createGroupChatCommand(message) {
 		(ch) => ch.type === 'category' && ch.name.toLowerCase() === parentCategoryName
 	)
 	const channelName = Object.keys(nationsChan).sort().join('-')
+
 	const channel = await guild.channels.create(channelName, {
 		parent: parent?.id || undefined,
 		permissionOverwrites,
