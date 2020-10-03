@@ -1,0 +1,17 @@
+{
+	"name": "civstabbr",
+	"version": "1.0.0",
+	"private": true,
+	"main": "index.js",
+	"license": "MIT",
+	"dependencies": {
+		"discord.js": "^12.3.1"
+	},
+	"prettier": {
+		"useTabs": true,
+		"tabWidth": 2,
+		"trailingComma": "es5",
+		"singleQuote": true,
+		"semi": false
+	}
+}
