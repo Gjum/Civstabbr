@@ -152,10 +152,15 @@ async function createGroupChatCommand(message) {
 	const existingChannel = guild.channels.cache.find((ch) => {
 		const anyIncorrect = Object.entries(game.nationRoles).find(([n, r]) => {
 			const shouldHavePerm = !!nationsChan[n]
-			const perms = ch.permissionOverwrites.get(r.id)?.allow
-			const hasPerm =
-				perms && useChannelPerms.map((p) => perms.has(p)).reduce((a, b) => a || b, false)
-			return hasPerm === shouldHavePerm
+			const permsAllow = ch.permissionOverwrites.get(r.id)?.allow
+			const hasAllow =
+				permsAllow &&
+				useChannelPerms.map((p) => permsAllow.has(p)).reduce((a, b) => a || b, false)
+			const permsDeny = ch.permissionOverwrites.get(r.id)?.deny
+			const hasDeny =
+				permsDeny &&
+				useChannelPerms.map((p) => permsDeny.has(p)).reduce((a, b) => a && b, true)
+			return hasAllow === shouldHavePerm && hasDeny !== shouldHavePerm
 		})
 		return !anyIncorrect
 	})
