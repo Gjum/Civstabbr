@@ -4,9 +4,12 @@ const token = process.env.DISCORD_TOKEN
 const commGuildId = process.env.COMM_GUILD_ID
 const adminRoleId = process.env.ADMIN_ROLE_ID
 
-const nationNames = 'Austria England France Germany Italy Russia Turkey'.split(
-	' '
-)
+const ownerTag = '@Gjum#1398'
+const ownerId = '730426592332873858'
+
+const categoryNameForId = (gameId) => `Diplomacy Gaming ${gameId}`
+
+const nationNames = 'Austria England France Germany Italy Russia Turkey'.split(' ')
 
 const d = new Discord.Client()
 d.on('error', (e) => console.error(e))
@@ -35,9 +38,7 @@ class Game {
 	async initialize() {
 		for (const nationName of nationNames) {
 			const roleName = `${nationName} ${this.id}`.toLowerCase()
-			const role = await guild.roles.cache.find(
-				(r) => r.name.toLowerCase() === roleName
-			)
+			const role = await guild.roles.cache.find((r) => r.name.toLowerCase() === roleName)
 			if (!role) throw new Error(`Could not find role ${roleName}`)
 			this.nationRoles[nationName] = role
 			this.nationUsers[nationName] = role.members.first()
@@ -65,7 +66,7 @@ async function findNationForMember(member) {
 async function reloadCommandPermitted(message) {
 	const member = guild.member(message.author)
 	const hasAdminRole = member.roles.cache.get(adminRoleId)
-	const isBotOwner = member.id === '730426592332873858'
+	const isBotOwner = member.id === ownerId
 	return hasAdminRole || isBotOwner
 }
 
@@ -77,8 +78,7 @@ async function helpCommand(message) {
 		'`group <nation1> <nation2>` - Create a group chat with these nations' +
 		'\n`help` - Show available commands'
 	if (canReloadBot)
-		response +=
-			'\n`reload` - Reload the bot to internally update roles and players'
+		response += '\n`reload` - Reload the bot to internally update roles and players'
 
 	message.channel.send(response)
 }
@@ -86,8 +86,7 @@ async function helpCommand(message) {
 /** @param {Discord.Message} message */
 async function reloadCommand(message) {
 	const canReloadBot = await reloadCommandPermitted(message)
-	if (!canReloadBot)
-		return message.channel.send(`Ask an admin to reload the bot.`)
+	if (!canReloadBot) return message.channel.send(`Ask an admin to reload the bot.`)
 
 	game = new Game(1)
 }
@@ -97,29 +96,28 @@ const createGroupChatRegex = /^!? *(create *)?group (?<nations>([A-Za-z]+( +|$))
 async function createGroupChatCommand(message) {
 	const member = guild.member(message.author)
 
-	const { name: nationNameUser, role: nationRoleUser } =
-		(await findNationForMember(member)) || {}
-	if (!nationNameUser)
-		return message.channel.send(
-			`You don't have the right nation role. Contact an admin or @Gjum#1398 to !reload the bot.`
-		)
-
 	/** @type {{[nationNAme:string]: Discord.Role}} */
 	const nationsChan = {}
 	/** @type {Discord.OverwriteResolvable[]} */
 	const permissionOverwrites = []
 
-	nationsChan[nationNameUser] = nationRoleUser
+	const { name: nationNameUser, role: nationRoleUser } =
+		(await findNationForMember(member)) || {}
+	if (!nationNameUser && member.id !== ownerId) {
+		return message.channel.send(
+			`You don't have the right nation role. Contact an admin or ${ownerTag} to !reload the bot.`
+		)
+	}
+	if (nationNameUser) nationsChan[nationNameUser] = nationRoleUser
 
 	const match = createGroupChatRegex.exec(message.content)
-	for (const nationNameRaw of match.groups.nations) {
+	for (const nationNameRaw of match.groups.nations.split(/ +/g)) {
 		if (!nationNameRaw.trim()) continue // consecutive spaces, ignore
 		let nationName = nationNameRaw
 		nationName = nationName.toLowerCase()
 		nationName = nationNames.find((n) => n.toLowerCase() === nationName)
 		const nationRole = game.nationRoles[nationName]
-		if (!nationRole)
-			return message.channel.send(`Unknown nation name: ${nationNameRaw}`)
+		if (!nationRole) return message.channel.send(`Unknown nation name: ${nationNameRaw}`)
 		nationsChan[nationNameRaw] = nationRole
 	}
 
@@ -134,7 +132,7 @@ async function createGroupChatCommand(message) {
 	}
 
 	// check the group chat doesn't exist already
-	const existingChannel = message.guild.channels.cache.find((ch) => {
+	const existingChannel = guild.channels.cache.find((ch) => {
 		const anyIncorrect = Object.entries(game.nationRoles).find(([n, r]) => {
 			const shouldHavePerm = !!nationsChan[n]
 			const hasPerm = !!ch.permissionOverwrites[r.id]
@@ -148,19 +146,18 @@ async function createGroupChatCommand(message) {
 		)
 
 	// actually create the channel
-	const parentCategoryName = `Diplomacy Gaming ${game.id}`.toLowerCase()
-	const parent = message.guild.channels.cache.find(
-		(ch) => ch.parent.name.toLowerCase() === parentCategoryName
+	const parentCategoryName = categoryNameForId(game.id).toLowerCase()
+	const parent = guild.channels.cache.find(
+		(ch) => ch.type === 'category' && ch.name.toLowerCase() === parentCategoryName
 	)
 	const channelName = Object.keys(nationsChan).sort().join('-')
 	const channel = await guild.channels.create(channelName, {
-		parent,
+		parent: parent?.id || undefined,
 		permissionOverwrites,
 	})
 
-	const currentPlayerRole = guild.roles.cache.find(
-		(r) => r.name === 'Current Player'
-	)
+	// ping Current Player role
+	const currentPlayerRole = guild.roles.cache.find((r) => r.name === 'Current Player')
 	if (currentPlayerRole) {
 		channel.send(`<@&${currentPlayerRole.id}>`)
 	}
@@ -173,27 +170,28 @@ d.on('ready', async () => {
 })
 
 d.on('message', async (message) => {
-	if (!message.author || message.author.bot) return // ignore bots
-	if (message.channel.type !== 'dm') return // only allow running commands from DMs
+	try {
+		if (!message.author || message.author.bot) return // ignore bots
+		if (message.channel.type !== 'dm') return // only allow running commands from DMs
 
-	if (!game || !game.initialized)
-		return message.channel.send(
-			`Please wait a moment for the bot to finish launching, then try again.`
-		)
+		if (!game || !game.initialized)
+			return message.channel.send(
+				`Please wait a moment for the bot to finish launching, then try again.`
+			)
 
-	await guild.members.fetch(message.author)
+		await guild.members.fetch(message.author)
 
-	const member = guild.member(message.author)
-	if (!member)
-		return message.channel.send(
-			`Join the server first: https://discord.gg/zXCJHTb`
-		)
+		const member = guild.member(message.author)
+		if (!member)
+			return message.channel.send(`Join the server first: https://discord.gg/zXCJHTb`)
 
-	if (createGroupChatRegex.test(message.content))
-		return createGroupChatCommand(message)
-	if (/^!? *(restart|reload)/i.test(message.content))
-		return reloadCommand(message)
-	return helpCommand(message)
+		if (createGroupChatRegex.test(message.content)) return createGroupChatCommand(message)
+		if (/^!? *(restart|reload)/i.test(message.content)) return reloadCommand(message)
+		return helpCommand(message)
+	} catch (err) {
+		message.channel.send(`There was an error while running your command :(`)
+		throw err
+	}
 })
 
 d.login(token)
