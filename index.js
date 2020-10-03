@@ -174,6 +174,7 @@ d.on('ready', async () => {
 
 d.on('message', async (message) => {
 	if (!message.author || message.author.bot) return // ignore bots
+	if (message.channel.type !== 'dm') return // only allow running commands from DMs
 
 	if (!game || !game.initialized)
 		return message.channel.send(
