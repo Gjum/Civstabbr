@@ -2,8 +2,11 @@
 	"name": "civstabbr",
 	"version": "1.0.0",
 	"private": true,
-	"main": "index.js",
 	"license": "MIT",
+	"main": "index.js",
+	"scripts": {
+		"start": "npm install && node index.js"
+	},
 	"dependencies": {
 		"discord.js": "^12.3.1"
 	},
